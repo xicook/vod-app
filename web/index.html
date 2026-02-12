@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+<title>x1co VOD</title>
+
+<style>
+
+/* ========= FUNDO ROXO ========= */
+
+body{
+  margin:0;
+  font-family:system-ui,sans-serif;
+  color:white;
+
+  background:linear-gradient(180deg,#2b0d4f,#170a2b,#0b0617);
+  padding-bottom:85px;
+}
+
+
+/* ========= TOPO ========= */
+
+.top{
+  display:flex;
+  gap:10px;
+  padding:14px;
+}
+
+input{
+  width:100%;
+  padding:12px 16px;
+  margin:4px 0;
+
+  background:#ffffff15;
+  color:white;
+  border:none;
+  outline:none;
+
+  border-radius:9999px;
+}
+
+
+/* ========= BOTÕES ========= */
+
+button{
+  padding:12px 18px;
+  border:none;
+  cursor:pointer;
+  font-weight:bold;
+
+  border-radius:9999px;
+
+  background:linear-gradient(135deg,#b14cff,#7b2cff);
+  color:white;
+
+  transition:.15s;
+}
+
+button:hover{
+  transform:scale(1.05);
+}
+
+
+/* ========= STATUS ========= */
+
+.msg{
+  text-align:center;
+  opacity:.7;
+  padding:6px;
+}
+
+
+/* ========= GRID ========= */
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+  gap:14px;
+  padding:14px;
+}
+
+
+/* ========= CARD ========= */
+
+.card{
+  background:#ffffff10;
+  border-radius:20px;
+  overflow:hidden;
+  cursor:pointer;
+  transition:.15s;
+  box-shadow:0 6px 18px #0007;
+}
+
+.card:hover{
+  transform:translateY(-5px);
+}
+
+.thumb{
+  width:100%;
+  height:160px;
+  object-fit:cover;
+}
+
+.noThumb{
+  height:160px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#0006;
+  font-size:13px;
+}
+
+.title{
+  padding:6px 8px;
+  font-size:14px;
+}
+
+.views{
+  padding:0 8px 8px;
+  font-size:12px;
+  opacity:.7;
+}
+
+
+/* ========= PLAYER ========= */
+
+.playerBox{
+  position:fixed;
+  bottom:70px;
+  width:100%;
+  background:#000;
+}
+
+video{
+  width:100%;
+}
+
+
+/* ========= NAVBAR ========= */
+
+.nav{
+  position:fixed;
+  bottom:0;
+  width:100%;
+  height:70px;
+
+  display:flex;
+  justify-content:space-around;
+  align-items:center;
+
+  background:#140b25ee;
+  backdrop-filter:blur(10px);
+}
+
+.nav button{
+  background:none;
+  border:none;
+  font-size:22px;
+  color:white;
+}
+
+.nav button:active{
+  transform:scale(.9);
+}
+
+</style>
+</head>
+
+
+<body>
+
+<div class="top">
+  <input id="server" placeholder="127.0.0.1:8000">
+  <button onclick="connect()">Conectar</button>
+</div>
+
+<div id="status" class="msg">Aguardando servidor...</div>
+
+<div id="list" class="grid"></div>
+
+<div class="playerBox">
+  <video id="player" controls></video>
+</div>
+
+<div class="nav">
+  <button onclick="goHome()">🏠</button>
+  <button onclick="goTrending()">🔥</button>
+  <button onclick="goMe()">👤</button>
+</div>
+
+
+
+<script>
+
+let base = localStorage.getItem("server") || ""
+let token = localStorage.getItem("token") || ""
+
+const list = document.getElementById("list")
+const status = document.getElementById("status")
+const player = document.getElementById("player")
+
+document.getElementById("server").value = base
+
+
+/* ======================= */
+
+function setStatus(t){
+  status.innerText = t
+}
+
+
+/* ======================= */
+
+function connect(){
+  base = "http://" + document.getElementById("server").value
+  localStorage.setItem("server", document.getElementById("server").value)
+  route()
+}
+
+
+/* ========= ROUTER ========= */
+
+function navigate(path){
+  history.pushState({}, "", path)
+  route()
+}
+
+window.onpopstate = route
+
+async function route(){
+  const path = location.pathname
+
+  if(path === "/trending-page"){
+    loadTrending()
+  }
+  else if(path === "/me-page"){
+    loadMe()
+  }
+  else{
+    loadVideos()
+  }
+}
+
+
+/* ========= HOME ========= */
+
+async function loadVideos(){
+  setStatus("Home")
+
+  const data = await fetch(base + "/videos").then(r=>r.json())
+  renderVideos(data.videos)
+}
+
+
+/* ========= TRENDING ========= */
+
+async function loadTrending(){
+  setStatus("🔥 Trending")
+
+  const data = await fetch(base + "/trending").then(r=>r.json())
+  renderVideos(data.videos)
+}
+
+
+/* ========= PROFILE ========= */
+
+async function loadMe(){
+  setStatus("Perfil")
+
+  const res = await fetch(base + "/me", {
+    headers:{ Authorization: token }
+  }).then(r=>r.json())
+
+  if(!res.logged){
+    list.innerHTML = `
+      <div style="text-align:center;margin-top:40px">
+        <input id="user" placeholder="Usuário">
+        <input id="pass" type="password" placeholder="Senha">
+        <button onclick="doLogin()">Login</button>
+        <button onclick="doRegister()">Registrar</button>
+      </div>
+    `
+    return
+  }
+
+  list.innerHTML = `
+    <div style="text-align:center;margin-top:40px">
+      <h2>👤 ${res.user}</h2>
+      <button onclick="logout()">Sair</button>
+    </div>
+  `
+}
+
+
+/* ========= LOGIN ========= */
+
+async function doLogin(){
+  const u = user.value
+  const p = pass.value
+
+  const res = await fetch(base + "/login",{
+    method:"POST",
+    headers:{ "Content-Type":"application/json"},
+    body: JSON.stringify({user:u, pass:p})
+  }).then(r=>r.json())
+
+  if(res.ok){
+    token = res.token
+    localStorage.setItem("token", token)
+    loadMe()
+  }else{
+    alert("Login errado 😭")
+  }
+}
+
+
+async function doRegister(){
+  await fetch(base + "/register",{
+    method:"POST",
+    headers:{ "Content-Type":"application/json"},
+    body: JSON.stringify({user:user.value, pass:pass.value})
+  })
+
+  alert("Registrado! Agora faz login 😎")
+}
+
+
+async function logout(){
+  await fetch(base + "/logout",{
+    method:"POST",
+    headers:{ Authorization: token }
+  })
+
+  token=""
+  localStorage.removeItem("token")
+  loadMe()
+}
+
+
+/* ========= RENDER ========= */
+
+function renderVideos(videos){
+  list.innerHTML=""
+
+  videos.forEach(v=>{
+    const div = document.createElement("div")
+    div.className="card"
+
+    div.innerHTML = `
+      <img class="thumb"
+        src="${base}/thumbs/${v.thumb}"
+        onerror="this.outerHTML='<div class=noThumb>Sem Thumbnail!</div>'">
+
+      <div class="title">${v.title}</div>
+      <div class="views">👁 ${v.views} views</div>
+    `
+
+    div.onclick = ()=>{
+      player.src = base + "/videos/" + v.file
+      player.play()
+
+      fetch(base + "/view/" + v.file, {method:"POST"})
+    }
+
+    list.appendChild(div)
+  })
+}
+
+
+/* ========= NAV ========= */
+
+function goHome(){ navigate("/") }
+function goTrending(){ navigate("/trending-page") }
+function goMe(){ navigate("/me-page") }
+
+
+if(base) route()
+
+</script>
+
+</body>
+</html>
